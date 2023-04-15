@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="UserContentModel">
+    <attachedFolders />
+    <explicitIncludes>
+      <Path>.gitignore</Path>
+      <Path>Echo/paket.references</Path>
+      <Path>Readme.md</Path>
+      <Path>global.json</Path>
+      <Path>maelstrom.ps1</Path>
+      <Path>paket.dependencies</Path>
+    </explicitIncludes>
+    <explicitExcludes />
+  </component>
+</project>
