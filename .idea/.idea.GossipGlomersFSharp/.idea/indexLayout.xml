@@ -6,6 +6,7 @@
       <Path>.gitignore</Path>
       <Path>Echo/paket.references</Path>
       <Path>Readme.md</Path>
+      <Path>Taskfile.yml</Path>
       <Path>global.json</Path>
       <Path>maelstrom.ps1</Path>
       <Path>paket.dependencies</Path>

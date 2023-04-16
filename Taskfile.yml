@@ -1,0 +1,24 @@
+# For running exercises in windows using WSL for running maelstrom.
+version: '3'
+
+tasks:
+  default:
+    desc: Run all exercises
+    deps:
+      - echo
+
+  echo:
+    desc: Run the echo exercise
+    deps: [ build ]
+    cmds:
+      - wsl \~/maelstrom/maelstrom test -w echo --bin Echo/bin/Debug/net6.0/echo.exe --node-count 1 --time-limit 10
+
+  build:
+    cmds:
+      - dotnet build
+
+  view:
+    desc: View results of the various runs
+    cmds:
+      - echo "Since we're running in WSL open http://localhost:8080 instead of what's printed below ..."
+      - wsl \~/maelstrom/maelstrom serve
