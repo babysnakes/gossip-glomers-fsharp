@@ -32,7 +32,10 @@ type InitResponse =
       InReplyTo: int option }
 
 module Node =
-    let jsonOptions = JsonConfig.create (serializeNone = SerializeNone.Omit)
+    // Generate unformatted json without None values.
+    let jsonOptions =
+        JsonConfig.create (unformatted = true, serializeNone = SerializeNone.Omit)
+
     let private write (ln: string) = Console.WriteLine(ln)
 
     let private read () =
@@ -48,7 +51,7 @@ module Node =
           Body =
             { Typ = InitOk
               InReplyTo = msg.Body.MsgId } }
-        |> Json.serializeU
+        |> Json.serializeEx jsonOptions
 
     let handleMessage<'T> (f: 'T -> 'T) json =
         let msg: Message<'T> = Json.deserialize json
@@ -57,7 +60,7 @@ module Node =
         { Src = msg.Dst
           Dst = msg.Src
           Body = newBody }
-        |> Json.serializeU
+        |> Json.serializeEx jsonOptions
 
     let rec run<'T> (f: 'T -> 'T) (initialized: bool) =
         match read () with
