@@ -1,2 +1,23 @@
-﻿// For more information see https://aka.ms/fsharp-console-apps
-printfn "Hello from F#"
+﻿open GGF.Lib
+open FSharp.Json
+
+type EchoTyp =
+    | [<JsonUnionCase("echo")>] Echo
+    | [<JsonUnionCase("echo_ok")>] EchoOk
+
+type Message =
+    { [<JsonField("type")>]
+      Typ: EchoTyp
+      [<JsonField("msg_id")>]
+      MsgId: int option
+      [<JsonField("in_reply_to")>]
+      InReplyTo: int option
+      [<JsonField("echo")>]
+      Echo: string }
+
+let handle (msg: Message) : Message =
+    { msg with
+        InReplyTo = msg.MsgId
+        Typ = EchoOk }
+
+Node.run handle false
