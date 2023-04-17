@@ -15,7 +15,7 @@ type Message =
       [<JsonField("echo")>]
       Echo: string }
 
-let handle (msg: Message) : Message =
+let handle (_: string) (msg: Message) : Message =
     { msg with
         InReplyTo = msg.MsgId
         Typ = EchoOk }

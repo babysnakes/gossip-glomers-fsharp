@@ -7,6 +7,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GGF.Echo", "Echo\GGF.Echo.f
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GGF.Lib", "Lib\GGF.Lib.fsproj", "{DDD5B7B3-6820-4B0F-A5D9-D72A93A14D14}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GGF.UniqueIDGeneration", "UniqueIDGeneration\GGF.UniqueIDGeneration.fsproj", "{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}"
+EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -44,5 +46,17 @@ Global
 		{DDD5B7B3-6820-4B0F-A5D9-D72A93A14D14}.Release|x64.Build.0 = Release|Any CPU
 		{DDD5B7B3-6820-4B0F-A5D9-D72A93A14D14}.Release|x86.ActiveCfg = Release|Any CPU
 		{DDD5B7B3-6820-4B0F-A5D9-D72A93A14D14}.Release|x86.Build.0 = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|x64.Build.0 = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Debug|x86.Build.0 = Debug|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|x64.ActiveCfg = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|x64.Build.0 = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|x86.ActiveCfg = Release|Any CPU
+		{4185629D-1AE8-47BD-A26C-9204AE3B3DE9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -31,6 +31,8 @@ type InitResponse =
       [<JsonField("in_reply_to")>]
       InReplyTo: int option }
 
+type MessageHandler<'T> = string -> 'T -> 'T
+
 module Node =
     // Generate unformatted json without None values.
     let jsonOptions =
@@ -53,16 +55,17 @@ module Node =
               InReplyTo = msg.Body.MsgId } }
         |> Json.serializeEx jsonOptions
 
-    let handleMessage<'T> (f: 'T -> 'T) json =
+    let handleMessage<'T> (f: MessageHandler<'T>) json =
         let msg: Message<'T> = Json.deserialize json
-        let newBody = f msg.Body
+        let handler = f msg.Dst
+        let newBody = handler msg.Body
 
         { Src = msg.Dst
           Dst = msg.Src
           Body = newBody }
         |> Json.serializeEx jsonOptions
 
-    let rec run<'T> (f: 'T -> 'T) (initialized: bool) =
+    let rec run<'T> (f: MessageHandler<'T>) (initialized: bool) =
         match read () with
         | Some(ln) ->
             if initialized then handleMessage f ln else handleInit ln
