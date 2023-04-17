@@ -3,21 +3,29 @@ version: '3'
 
 tasks:
   default:
-    desc: Run all exercises
+    desc: Run all challenges
     deps:
+      - broadcast
+      - unique-ids
       - echo
 
   echo:
-    desc: Run the echo exercise
+    desc: Run the echo challenge
     deps: [ build ]
     cmds:
       - wsl \~/maelstrom/maelstrom test -w echo --bin Echo/bin/Debug/net6.0/echo.exe --node-count 1 --time-limit 10
 
   unique-ids:
-    desc: Run the Unique ID Generation exercise
+    desc: Run the Unique ID Generation challenge
     deps: [ build ]
     cmds:
       - wsl \~/maelstrom/maelstrom test -w unique-ids --bin UniqueIDGeneration/bin/Debug/net6.0/unique-ids.exe  --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition
+
+  broadcast:
+    desc: Run the Broadcast challenge
+    deps: [ build ]
+    cmds:
+      - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Debug/net6.0/broadcast.exe --node-count 1 --time-limit 20 --rate 10
 
   build:
     cmds:

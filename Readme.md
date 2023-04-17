@@ -2,7 +2,9 @@
 
 > [A series of distributed systems challenges brought to you by Fly.io][fly.io].
 
-Implementation of the challenges described in the link above using _F#_.
+Implementation of the challenges described in the link above using _F#_. I had to decide whether or not to allow types
+with invalid state or to use low level json parsing. For now I chose to allow types with invalid state. Once done I may
+try the opposite.
 
 ### Setup for Running in Windows
 
