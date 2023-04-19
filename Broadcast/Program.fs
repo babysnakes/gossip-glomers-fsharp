@@ -30,7 +30,7 @@ type State = { mutable Messages: int list }
 
 let addInReply (msg: Message) : Message = { msg with InReplyTo = msg.MsgId }
 
-let handler (state: State) (_: string) (msg: Message) : Message =
+let handler (state: State) (_: Node) (msg: Message) : Message =
     match msg.Typ with
     | BroadcastOk
     | ReadOk
@@ -54,4 +54,4 @@ let handler (state: State) (_: string) (msg: Message) : Message =
         |> addInReply
 
 let state = { Messages = [] }
-Node.run (handler state) false
+Node.run (handler state)

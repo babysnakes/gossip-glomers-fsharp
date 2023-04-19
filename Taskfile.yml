@@ -36,3 +36,8 @@ tasks:
     cmds:
       - echo "Since we're running in WSL open http://localhost:8080 instead of what's printed below ..."
       - wsl \~/maelstrom/maelstrom serve
+
+  format:
+    desc: Run format check
+    cmds:
+      - dotnet fantomas -r check Lib Echo Broadcast UniqueIDGeneration

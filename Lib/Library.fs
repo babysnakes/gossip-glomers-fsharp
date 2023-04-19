@@ -31,22 +31,22 @@ type InitResponse =
       [<JsonField("in_reply_to")>]
       InReplyTo: int option }
 
-type MessageHandler<'T> = string -> 'T -> 'T
+type Node =
+    { Name: string
+      Neighbours: string list }
+
+type MessageHandler<'T> = Node -> 'T -> 'T
 
 module Node =
     // Generate unformatted json without None values.
     let jsonOptions =
         JsonConfig.create (unformatted = true, serializeNone = SerializeNone.Omit)
 
-    let private write (ln: string) = Console.WriteLine(ln)
+    let send (ln: string) = Console.WriteLine(ln)
+    let private receive () = Console.ReadLine()
 
-    let private read () =
-        let input = Console.ReadLine()
-
-        if String.IsNullOrEmpty(input) then None else Some(input)
-
-    let handleInit json =
-        let msg: Message<InitRequest> = Json.deserialize json
+    let private initialize: Node =
+        let msg: Message<InitRequest> = receive () |> Json.deserialize
 
         { Src = msg.Dst
           Dst = msg.Src
@@ -54,22 +54,25 @@ module Node =
             { Typ = InitOk
               InReplyTo = msg.Body.MsgId } }
         |> Json.serializeEx jsonOptions
+        |> send
 
-    let handleMessage<'T> (f: MessageHandler<'T>) json =
-        let msg: Message<'T> = Json.deserialize json
-        let handler = f msg.Dst
-        let newBody = handler msg.Body
+        let neighbours =
+            msg.Body.NodeIds |> Set.ofList |> Set.remove msg.Body.NodeId |> Set.toList
+
+        { Name = msg.Body.NodeId
+          Neighbours = neighbours }
+
+    let rec private handleMessageLoop<'T> (f: MessageHandler<'T>) (node: Node) =
+        let msg: Message<'T> = receive () |> Json.deserialize
+        let newBody = f node msg.Body
 
         { Src = msg.Dst
           Dst = msg.Src
           Body = newBody }
         |> Json.serializeEx jsonOptions
+        |> send
 
-    let rec run<'T> (f: MessageHandler<'T>) (initialized: bool) =
-        match read () with
-        | Some(ln) ->
-            if initialized then handleMessage f ln else handleInit ln
-            |> write
+        handleMessageLoop f node
 
-            run f true
-        | None -> ()
+    let run<'T> (f: MessageHandler<'T>) =
+        initialize |> handleMessageLoop f |> ignore
