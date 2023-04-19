@@ -35,7 +35,7 @@ type Node =
     { Name: string
       Neighbours: string list }
 
-type MessageHandler<'T> = Node -> 'T -> 'T
+type MessageHandler<'T> = Node -> 'T -> 'T option
 
 module Node =
     // Generate unformatted json without None values.
@@ -64,13 +64,16 @@ module Node =
 
     let rec private handleMessageLoop<'T> (f: MessageHandler<'T>) (node: Node) =
         let msg: Message<'T> = receive () |> Json.deserialize
-        let newBody = f node msg.Body
 
-        { Src = msg.Dst
-          Dst = msg.Src
-          Body = newBody }
-        |> Json.serializeEx jsonOptions
-        |> send
+        f node msg.Body
+        |> function
+            | Some(newBody) ->
+                { Src = msg.Dst
+                  Dst = msg.Src
+                  Body = newBody }
+                |> Json.serializeEx jsonOptions
+                |> send
+            | None -> ()
 
         handleMessageLoop f node
 

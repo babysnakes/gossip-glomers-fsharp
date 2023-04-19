@@ -17,7 +17,7 @@ type Message =
 
 type UniqueIDGenerator = { mutable id: int }
 
-let handler (uig: UniqueIDGenerator) (node: Node) (msg: Message) : Message =
+let handler (uig: UniqueIDGenerator) (node: Node) (msg: Message) : Message option =
     uig.id <- uig.id + 1
 
     match msg.Typ with
@@ -27,6 +27,7 @@ let handler (uig: UniqueIDGenerator) (node: Node) (msg: Message) : Message =
           Typ = GenerateOk
           MsgId = msg.MsgId
           InReplyTo = msg.MsgId }
+        |> Some
 
 let uig = { id = 0 }
 Node.run (handler uig)
