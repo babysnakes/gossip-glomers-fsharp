@@ -17,17 +17,15 @@ type Message =
 
 type UniqueIDGenerator = { mutable id: int }
 
-let handler (uig: UniqueIDGenerator) (node: Node) (msg: Message) : Message option =
-    uig.id <- uig.id + 1
-
+let handler (id: uint) (MessageWithSource(_: string, msg: Message)) (node: Node) =
     match msg.Typ with
     | GenerateOk -> failwith "Invalid client message: generate_ok"
     | Generate ->
-        { Id = Some($"{node}:%d{uig.id}")
+        { Id = Some($"{node}:%d{id}")
           Typ = GenerateOk
           MsgId = msg.MsgId
           InReplyTo = msg.MsgId }
         |> Some
+        |> fun response -> (id + 1u, response)
 
-let uig = { id = 0 }
-Node.run (handler uig)
+Node.run 1u handler

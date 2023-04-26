@@ -32,7 +32,9 @@ type BroadcastRepeaterMsg =
       Node: string
       Nodes: string list }
 
-type State = { mutable Messages: int list }
+type State =
+    { Messages: Set<int>
+      Destinations: string list }
 
 type BroadcastRepeat = BroadcastRepeat of BroadcastRepeaterMsg
 
@@ -63,14 +65,12 @@ let broadcastRepeaterAgent =
 
 let addInReply (msg: Message) : Message = { msg with InReplyTo = msg.MsgId }
 
-let handler (state: State) (node: Node) (msg: Message) : Message option =
+let handler (state: State) (MessageWithSource(_, msg)) (node: Node) =
     match msg.Typ with
     | ReadOk
     | TopologyOk -> failwith "node received OK type"
-    | BroadcastOk -> None
+    | BroadcastOk -> state, None
     | Broadcast ->
-        state.Messages <- msg.Message.Value :: state.Messages
-
         { MsgId = msg.MsgId
           Message = msg.Message.Value
           Node = node.Name
@@ -83,18 +83,32 @@ let handler (state: State) (node: Node) (msg: Message) : Message option =
             Message = None }
         |> addInReply
         |> Some
+        |> fun response ->
+            { state with
+                Messages = Set.add msg.Message.Value state.Messages },
+            response
     | Read ->
         { msg with
             Typ = ReadOk
-            Messages = Some(state.Messages) }
+            Messages = Some(state.Messages |> Set.toList) }
         |> addInReply
         |> Some
+        |> fun response -> state, response
     | Topology ->
+        let destinations =
+            match msg.Topology with
+            | Some(destMap) -> destMap |> Map.tryFind node.Name |> Option.defaultValue []
+            | None -> []
+
         { msg with
             Typ = TopologyOk
             Topology = None }
         |> addInReply
         |> Some
+        |> fun response ->
+            { state with
+                Destinations = destinations },
+            response
 
-let state = { Messages = [] }
-Node.run (handler state)
+let state = { Messages = Set.empty; Destinations = [] }
+Node.run state handler

@@ -15,10 +15,11 @@ type Message =
       [<JsonField("echo")>]
       Echo: string }
 
-let handle (_: Node) (msg: Message) : Message option =
+let handle _ (MessageWithSource(_: string, msg: Message)) (_: Node) =
     { msg with
         InReplyTo = msg.MsgId
         Typ = EchoOk }
     |> Some
+    |> fun response -> ((), response)
 
-Node.run handle
+Node.run () handle

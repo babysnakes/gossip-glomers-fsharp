@@ -35,7 +35,8 @@ type Node =
     { Name: string
       Neighbours: string list }
 
-type MessageHandler<'T> = Node -> 'T -> 'T option
+type MessageWithSource<'Msg> = MessageWithSource of string * 'Msg
+type MessageHandler<'Msg, 'State> = 'State -> MessageWithSource<'Msg> -> Node -> Tuple<'State, 'Msg option>
 
 module Node =
     // Generate unformatted json without None values.
@@ -62,20 +63,20 @@ module Node =
         { Name = msg.Body.NodeId
           Neighbours = neighbours }
 
-    let rec private handleMessageLoop<'T> (f: MessageHandler<'T>) (node: Node) =
-        let msg: Message<'T> = receive () |> Json.deserialize
+    let rec private handleMessageLoop<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) (node: Node) =
+        let msg: Message<'Msg> = receive () |> Json.deserialize
+        let newState, response = f state (MessageWithSource(msg.Src, msg.Body)) node
 
-        f node msg.Body
-        |> function
-            | Some(newBody) ->
-                { Src = msg.Dst
-                  Dst = msg.Src
-                  Body = newBody }
-                |> Json.serializeEx jsonOptions
-                |> send
-            | None -> ()
+        match response with
+        | Some(newBody) ->
+            { Src = msg.Dst
+              Dst = msg.Src
+              Body = newBody }
+            |> Json.serializeEx jsonOptions
+            |> send
+        | None -> ()
 
-        handleMessageLoop f node
+        handleMessageLoop newState f node
 
-    let run<'T> (f: MessageHandler<'T>) =
-        initialize |> handleMessageLoop f |> ignore
+    let run<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) =
+        initialize |> handleMessageLoop state f |> ignore
