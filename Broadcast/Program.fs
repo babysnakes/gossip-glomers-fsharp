@@ -29,7 +29,7 @@ type Message =
 type BroadcastRepeaterMsg =
     { MsgId: int option
       Message: int
-      Node: string
+      Dispatcher: Dispatcher<Message>
       Nodes: string list }
 
 type State =
@@ -44,19 +44,16 @@ let broadcastRepeaterAgent =
             async {
                 let! BroadcastRepeat(msg) = inbox.Receive()
 
-                msg.Nodes
-                |> List.iter (fun node ->
-                    { Src = msg.Node
-                      Dst = node
-                      Body =
+                do
+                    msg.Nodes
+                    |> List.iter (fun dest ->
                         { MsgId = msg.MsgId
                           Message = Some(msg.Message)
                           Typ = Broadcast
                           InReplyTo = None
                           Messages = None
-                          Topology = None } }
-                    |> Json.serializeEx Node.jsonOptions
-                    |> Node.send)
+                          Topology = None }
+                        |> msg.Dispatcher dest)
 
                 return! messageLoop ()
             }
@@ -65,15 +62,19 @@ let broadcastRepeaterAgent =
 
 let addInReply (msg: Message) : Message = { msg with InReplyTo = msg.MsgId }
 
-let handler (state: State) (MessageWithSource(_, msg)) (node: Node) =
+let handler (state: State) (node: Node) (dispatch: Dispatcher<Message>) (MessageWithSource(src, msg)) =
     match msg.Typ with
     | ReadOk
     | TopologyOk -> failwith "node received OK type"
-    | BroadcastOk -> state, None
+    | BroadcastOk -> state
     | Broadcast ->
+        let newState =
+            { state with
+                Messages = Set.add msg.Message.Value state.Messages }
+
         { MsgId = msg.MsgId
           Message = msg.Message.Value
-          Node = node.Name
+          Dispatcher =  dispatch
           Nodes = node.Neighbours }
         |> BroadcastRepeat
         |> broadcastRepeaterAgent.Post
@@ -82,33 +83,37 @@ let handler (state: State) (MessageWithSource(_, msg)) (node: Node) =
             Typ = BroadcastOk
             Message = None }
         |> addInReply
-        |> Some
-        |> fun response ->
-            { state with
-                Messages = Set.add msg.Message.Value state.Messages },
-            response
+        |> dispatch src
+
+        newState
     | Read ->
         { msg with
             Typ = ReadOk
             Messages = Some(state.Messages |> Set.toList) }
         |> addInReply
-        |> Some
-        |> fun response -> state, response
+        |> dispatch src
+
+        state
     | Topology ->
-        let destinations =
-            match msg.Topology with
-            | Some(destMap) -> destMap |> Map.tryFind node.Name |> Option.defaultValue []
-            | None -> []
+        let newState =
+            msg.Topology
+            |> Option.map (Map.tryFind node.Name >> Option.defaultValue [])
+            |> function
+                | Some(destinations) ->
+                    { state with
+                        Destinations = destinations }
+                | None -> state
 
         { msg with
             Typ = TopologyOk
             Topology = None }
         |> addInReply
-        |> Some
-        |> fun response ->
-            { state with
-                Destinations = destinations },
-            response
+        |> dispatch src
 
-let state = { Messages = Set.empty; Destinations = [] }
+        newState
+
+let state =
+    { Messages = Set.empty
+      Destinations = [] }
+
 Node.run state handler

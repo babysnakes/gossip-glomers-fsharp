@@ -15,17 +15,16 @@ type Message =
       [<JsonField("in_reply_to")>]
       InReplyTo: int option }
 
-type UniqueIDGenerator = { mutable id: int }
-
-let handler (id: uint) (MessageWithSource(_: string, msg: Message)) (node: Node) =
+let handler (id: uint) _ (dispatch: Dispatcher<Message>) (MessageWithSource(src, msg)) =
     match msg.Typ with
     | GenerateOk -> failwith "Invalid client message: generate_ok"
     | Generate ->
-        { Id = Some($"{node}:%d{id}")
+        { Id = Some($"{src}:%d{id}")
           Typ = GenerateOk
           MsgId = msg.MsgId
           InReplyTo = msg.MsgId }
-        |> Some
-        |> fun response -> (id + 1u, response)
+        |> dispatch src
+    
+    id + 1u
 
 Node.run 1u handler

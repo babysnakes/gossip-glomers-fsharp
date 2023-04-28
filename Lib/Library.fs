@@ -36,47 +36,40 @@ type Node =
       Neighbours: string list }
 
 type MessageWithSource<'Msg> = MessageWithSource of string * 'Msg
-type MessageHandler<'Msg, 'State> = 'State -> MessageWithSource<'Msg> -> Node -> Tuple<'State, 'Msg option>
+type Dispatcher<'Msg> = string -> 'Msg -> unit
+type MessageHandler<'Msg, 'State> = 'State -> Node -> Dispatcher<'Msg> -> MessageWithSource<'Msg> -> 'State
 
 module Node =
     // Generate unformatted json without None values.
     let jsonOptions =
         JsonConfig.create (unformatted = true, serializeNone = SerializeNone.Omit)
 
-    let send (ln: string) = Console.WriteLine(ln)
+    let private send (ln: string) = Console.WriteLine(ln)
     let private receive () = Console.ReadLine()
 
-    let private initialize: Node =
+    let sendMessage<'Msg> (src: string) (dest: string) (msg: 'Msg) =
+        { Src = src; Dst = dest; Body = msg } |> Json.serializeEx jsonOptions |> send
+
+    let private initialize () : Node =
         let msg: Message<InitRequest> = receive () |> Json.deserialize
+        sendMessage msg.Dst msg.Src { Typ = InitOk; InReplyTo = msg.Body.MsgId }
 
-        { Src = msg.Dst
-          Dst = msg.Src
-          Body =
-            { Typ = InitOk
-              InReplyTo = msg.Body.MsgId } }
-        |> Json.serializeEx jsonOptions
-        |> send
+        msg.Body.NodeIds
+        |> Set.ofList
+        |> Set.remove msg.Body.NodeId
+        |> Set.toList
+        |> fun neighbours ->
+            { Name = msg.Body.NodeId
+              Neighbours = neighbours }
 
-        let neighbours =
-            msg.Body.NodeIds |> Set.ofList |> Set.remove msg.Body.NodeId |> Set.toList
+    let private handleMessageLoop<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) (node: Node) =
+        let dispatcher = sendMessage<'Msg> node.Name
 
-        { Name = msg.Body.NodeId
-          Neighbours = neighbours }
+        let rec loop (f: MessageHandler<'Msg, 'State>) (state: 'State) =
+            let msg: Message<'Msg> = receive () |> Json.deserialize
+            f state node dispatcher (MessageWithSource(msg.Src, msg.Body)) |> loop f
 
-    let rec private handleMessageLoop<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) (node: Node) =
-        let msg: Message<'Msg> = receive () |> Json.deserialize
-        let newState, response = f state (MessageWithSource(msg.Src, msg.Body)) node
-
-        match response with
-        | Some(newBody) ->
-            { Src = msg.Dst
-              Dst = msg.Src
-              Body = newBody }
-            |> Json.serializeEx jsonOptions
-            |> send
-        | None -> ()
-
-        handleMessageLoop newState f node
+        loop f state
 
     let run<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) =
-        initialize |> handleMessageLoop state f |> ignore
+        initialize () |> handleMessageLoop state f |> ignore

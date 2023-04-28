@@ -15,11 +15,10 @@ type Message =
       [<JsonField("echo")>]
       Echo: string }
 
-let handle _ (MessageWithSource(_: string, msg: Message)) (_: Node) =
+let handle _ _ (dispatch: Dispatcher<Message>) (MessageWithSource(src: string, msg: Message)) =
     { msg with
         InReplyTo = msg.MsgId
         Typ = EchoOk }
-    |> Some
-    |> fun response -> ((), response)
+    |> dispatch src
 
 Node.run () handle
