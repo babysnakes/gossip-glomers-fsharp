@@ -25,7 +25,7 @@ tasks:
     desc: Run the Broadcast challenge
     deps: [ build ]
     cmds:
-      - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Release/net6.0/broadcast.exe --node-count 5 --time-limit 20 --rate 10
+      - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Release/net6.0/broadcast.exe --node-count 5 --time-limit 20 --rate 10 --nemesis partition
 
   build:
     cmds:

@@ -35,9 +35,18 @@ type Node =
     { Name: string
       Neighbours: string list }
 
-type MessageWithSource<'Msg> = MessageWithSource of string * 'Msg
+type MessageData<'Msg> = MessageData of string * 'Msg
 type Dispatcher<'Msg> = string -> 'Msg -> unit
-type MessageHandler<'Msg, 'State> = 'State -> Node -> Dispatcher<'Msg> -> MessageWithSource<'Msg> -> 'State
+type MessageHandler<'Msg, 'State> = 'State -> Node -> Dispatcher<'Msg> -> MessageData<'Msg> -> 'State
+type BackgroundAgent<'Msg> = Dispatcher<'Msg> -> unit
+
+type AgentData<'Msg> =
+    { Agent: BackgroundAgent<'Msg>
+      Frequency: int }
+
+type HandlerData<'Msg, 'State> =
+    { Handler: MessageHandler<'Msg, 'State>
+      State: 'State }
 
 module Node =
     // Generate unformatted json without None values.
@@ -50,9 +59,27 @@ module Node =
     let sendMessage<'Msg> (src: string) (dest: string) (msg: 'Msg) =
         { Src = src; Dst = dest; Body = msg } |> Json.serializeEx jsonOptions |> send
 
-    let private initialize () : Node =
+    let private mkLoop (dispatch: Dispatcher<'Msg>) (agentData: AgentData<'Msg>) =
+        let rec loop () =
+            async {
+                do! Async.Sleep agentData.Frequency
+                do agentData.Agent dispatch
+                return! loop ()
+            }
+
+        loop ()
+
+    let private initialize<'Msg> (agentData: AgentData<'Msg> option) : Node =
         let msg: Message<InitRequest> = receive () |> Json.deserialize
-        sendMessage msg.Dst msg.Src { Typ = InitOk; InReplyTo = msg.Body.MsgId }
+        let dispatcher = sendMessage msg.Dst
+
+        { Typ = InitOk
+          InReplyTo = msg.Body.MsgId }
+        |> sendMessage msg.Dst msg.Src
+
+        match agentData with
+        | Some ad -> mkLoop dispatcher ad |> Async.Start
+        | None -> ()
 
         msg.Body.NodeIds
         |> Set.ofList
@@ -62,14 +89,14 @@ module Node =
             { Name = msg.Body.NodeId
               Neighbours = neighbours }
 
-    let private handleMessageLoop<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) (node: Node) =
+    let private handleMessages<'Msg, 'State> (hData: HandlerData<'Msg, 'State>) (node: Node) =
         let dispatcher = sendMessage<'Msg> node.Name
 
         let rec loop (f: MessageHandler<'Msg, 'State>) (state: 'State) =
             let msg: Message<'Msg> = receive () |> Json.deserialize
-            f state node dispatcher (MessageWithSource(msg.Src, msg.Body)) |> loop f
+            f state node dispatcher (MessageData(msg.Src, msg.Body)) |> loop f
 
-        loop f state
+        loop hData.Handler hData.State
 
-    let run<'Msg, 'State> (state: 'State) (f: MessageHandler<'Msg, 'State>) =
-        initialize () |> handleMessageLoop state f |> ignore
+    let run<'Msg, 'State> (ad: AgentData<'Msg> option) (hData: HandlerData<'Msg, 'State>) =
+        initialize ad |> handleMessages hData |> ignore

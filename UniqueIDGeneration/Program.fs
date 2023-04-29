@@ -15,7 +15,7 @@ type Message =
       [<JsonField("in_reply_to")>]
       InReplyTo: int option }
 
-let handler (id: uint) _ (dispatch: Dispatcher<Message>) (MessageWithSource(src, msg)) =
+let handler (id: uint) _ (dispatch: Dispatcher<Message>) (MessageData(src, msg)) =
     match msg.Typ with
     | GenerateOk -> failwith "Invalid client message: generate_ok"
     | Generate ->
@@ -24,7 +24,7 @@ let handler (id: uint) _ (dispatch: Dispatcher<Message>) (MessageWithSource(src,
           MsgId = msg.MsgId
           InReplyTo = msg.MsgId }
         |> dispatch src
-    
+
     id + 1u
 
-Node.run 1u handler
+Node.run None { Handler = handler; State = 1u }
