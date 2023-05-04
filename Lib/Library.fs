@@ -79,7 +79,7 @@ type Node =
 type MessageData<'Msg> = MessageData of string * 'Msg
 type Dispatcher<'Msg> = string -> 'Msg -> unit
 type MessageHandler<'Msg, 'State> = 'State -> Node -> Dispatcher<'Msg> -> MessageData<'Msg> -> 'State
-type BackgroundAgent<'Msg> = Dispatcher<'Msg> -> unit
+type BackgroundAgent<'Msg> = Dispatcher<'Msg> -> Node -> unit
 
 type AgentData<'Msg> =
     { Agent: BackgroundAgent<'Msg>
@@ -102,11 +102,11 @@ module Node =
     let sendMessage<'Msg> (src: string) (dest: string) (msg: 'Msg) =
         { Src = src; Dst = dest; Body = msg } |> Json.serializeEx jsonOptions |> send
 
-    let private mkLoop (dispatch: Dispatcher<'Msg>) (agentData: AgentData<'Msg>) =
+    let private mkLoop (dispatch: Dispatcher<'Msg>) (agentData: AgentData<'Msg>) (node: Node) =
         let rec loop () =
             async {
                 do! Async.Sleep agentData.Frequency
-                do agentData.Agent dispatch
+                do agentData.Agent dispatch node
                 return! loop ()
             }
 
@@ -120,17 +120,18 @@ module Node =
           InReplyTo = msg.Body.MsgId }
         |> sendMessage msg.Dst msg.Src
 
+        let node =
+            msg.Body.NodeIds
+            |> List.filter ((<>) msg.Body.NodeId)
+            |> fun neighbours ->
+                { Name = msg.Body.NodeId
+                  Neighbours = neighbours }
+        
         match agentData with
-        | Some ad -> mkLoop dispatcher ad |> Async.Start
+        | Some ad -> mkLoop dispatcher ad node |> Async.Start
         | None -> ()
 
-        msg.Body.NodeIds
-        |> Set.ofList
-        |> Set.remove msg.Body.NodeId
-        |> Set.toList
-        |> fun neighbours ->
-            { Name = msg.Body.NodeId
-              Neighbours = neighbours }
+        node
 
     let private handleMessages<'Msg, 'State> (hData: HandlerData<'Msg, 'State>) (node: Node) =
         let dispatcher = sendMessage<'Msg> node.Name

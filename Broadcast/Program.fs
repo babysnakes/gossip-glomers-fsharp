@@ -101,8 +101,19 @@ module StateManagement =
 
 let addInReply (msg: Message) : Message = { msg with InReplyTo = msg.MsgId }
 
-let agent (dispatch: Dispatcher<Message>) : unit =
+let getRandomElementsWithExclusion<'T when 'T: equality> (count: int) (xs: 'T list) (exclusions: 'T list) =
+    let rand = System.Random()
+    let filtered = xs |> List.except exclusions
+
+    [ 1..count ]
+    |> List.map (fun _ -> rand.Next(filtered |> List.length))
+    |> List.map (fun id -> List.item id filtered)
+
+let agent (dispatch: Dispatcher<Message>) (node: Node) : unit =
     let state = StateManagement.getState ()
+    let destinations =
+        getRandomElementsWithExclusion 2 node.Neighbours state.Destinations
+        |> List.append state.Destinations
 
     let computeMessages dest =
         state.Sent
@@ -112,7 +123,7 @@ let agent (dispatch: Dispatcher<Message>) : unit =
         |> Set.toList
         |> Some
 
-    for dest in state.Destinations do
+    for dest in destinations do
         { Message.empty () with
             MsgId = Some(state.Tick)
             Typ = Gossip
@@ -129,10 +140,8 @@ let handler (messages: Set<int>) (node: Node) (dispatch: Dispatcher<Message>) (M
         StateManagement.updateMessages newMessages
         newMessages
     | GossipOk ->
-        msg.Messages.Value
-        |> Set.ofList
-        |> StateManagement.updateSent src
-        
+        msg.Messages.Value |> Set.ofList |> StateManagement.updateSent src
+
         messages
     | Broadcast ->
         let newMessages = Set.add msg.Message.Value messages
