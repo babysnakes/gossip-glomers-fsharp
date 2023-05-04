@@ -5,6 +5,7 @@ tasks:
   default:
     desc: Run all challenges
     deps:
+      - broadcast:latency-partition
       - broadcast
       - unique-ids
       - echo
@@ -26,6 +27,18 @@ tasks:
     deps: [ build ]
     cmds:
       - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Release/net6.0/broadcast.exe --node-count 5 --time-limit 20 --rate 10 --nemesis partition
+
+  broadcast:latency:
+    desc: Run the Broadcast latency challenge
+    deps: [ build ]
+    cmds:
+      - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Release/net6.0/broadcast.exe --node-count 25 --time-limit 20 --rate 100 --latency 100
+
+  broadcast:latency-partition:
+    desc: Run the Broadcast latency challenge with partition split
+    deps: [ build ]
+    cmds:
+      - wsl \~/maelstrom/maelstrom test -w broadcast --bin Broadcast/bin/Release/net6.0/broadcast.exe --node-count 25 --time-limit 20 --rate 100 --latency 100 --nemesis partition
 
   build:
     cmds:

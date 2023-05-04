@@ -3,6 +3,47 @@
 open System
 open FSharp.Json
 
+module Logger =
+    type private LogMessage =
+        | Log of string
+        | Enable of bool
+
+    let private agent =
+        MailboxProcessor<LogMessage>.Start(fun inbox ->
+            let rec loop enabled =
+                async {
+                    let! msg = inbox.Receive()
+
+                    let newEnabled =
+                        match msg with
+                        | Log msg ->
+                            if enabled then eprintfn $"{msg}"
+                            enabled
+                        | Enable enable -> enable
+
+                    return! loop newEnabled
+                }
+
+            loop false)
+
+    /// Log a message
+    let log (msg: string) = agent.Post(Log(msg))
+
+    /// log message with "RECV: " prefix and return original message for composing
+    let logReceived (msg: string) =
+        log $"RECV: {msg}"
+        msg
+
+    /// log message with "SENT: " prefix and return original message for composing
+    let logSent (msg: string) =
+        log $"SENT: {msg}"
+        msg
+
+    /// Enable log messages
+    let enableLogger () = agent.Post(Enable(true))
+    /// Disable log messages
+    let disableLogger () = agent.Post(Enable(false))
+
 type Message<'T> =
     { [<JsonField("src")>]
       Src: string
@@ -53,7 +94,9 @@ module Node =
     let jsonOptions =
         JsonConfig.create (unformatted = true, serializeNone = SerializeNone.Omit)
 
-    let private send (ln: string) = Console.WriteLine(ln)
+    let private send (ln: string) =
+        Logger.logSent ln |> ignore
+        Console.WriteLine(ln)
     let private receive () = Console.ReadLine()
 
     let sendMessage<'Msg> (src: string) (dest: string) (msg: 'Msg) =
@@ -70,7 +113,7 @@ module Node =
         loop ()
 
     let private initialize<'Msg> (agentData: AgentData<'Msg> option) : Node =
-        let msg: Message<InitRequest> = receive () |> Json.deserialize
+        let msg: Message<InitRequest> = receive () |> Logger.logReceived |> Json.deserialize
         let dispatcher = sendMessage msg.Dst
 
         { Typ = InitOk
@@ -93,7 +136,7 @@ module Node =
         let dispatcher = sendMessage<'Msg> node.Name
 
         let rec loop (f: MessageHandler<'Msg, 'State>) (state: 'State) =
-            let msg: Message<'Msg> = receive () |> Json.deserialize
+            let msg: Message<'Msg> = receive () |> Logger.logReceived |> Json.deserialize
             f state node dispatcher (MessageData(msg.Src, msg.Body)) |> loop f
 
         loop hData.Handler hData.State

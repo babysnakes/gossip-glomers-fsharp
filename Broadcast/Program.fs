@@ -9,6 +9,8 @@ type RPCType =
     | [<JsonUnionCase("read_ok")>] ReadOk
     | [<JsonUnionCase("topology")>] Topology
     | [<JsonUnionCase("topology_ok")>] TopologyOk
+    | [<JsonUnionCase("gossip")>] Gossip
+    | [<JsonUnionCase("gossip_ok")>] GossipOk
 
 type Nodes = Map<string, string list>
 
@@ -34,122 +36,104 @@ type Message =
           Messages = None
           Topology = None }
 
-type BroadcastRepeaterMsg =
-    { MsgId: int option
-      Message: int
-      Dispatcher: Dispatcher<Message>
-      Nodes: string list }
-
 type State =
     { Tick: int
       Messages: Set<int>
-      Destinations: string list }
+      Destinations: string list
+      Sent: Map<string, Set<int>> }
 
 type StateAction =
     | SetMessages of Set<int>
     | SetDestinations of string list
-    | State
+    | UpdateSent of string * Set<int>
+    | State of AsyncReplyChannel<State>
 
-type BroadcastRepeat = BroadcastRepeat of BroadcastRepeaterMsg
-type StateMessage = StateAction * AsyncReplyChannel<State>
+[<RequireQualifiedAccess>]
+module StateManagement =
 
-type StateManagement() =
-
-    static let mutable _state =
+    let private defaultState =
         { Tick = 1
           Messages = Set.empty
-          Destinations = [] }
+          Destinations = []
+          Sent = Map.empty }
 
-    static let agent =
-        MailboxProcessor<StateMessage>.Start(fun inbox ->
-            let rec loop () =
+    let private agent =
+        MailboxProcessor<StateAction>.Start(fun inbox ->
+            let rec loop (state: State) =
                 async {
-                    let! msg, replyChannel = inbox.Receive()
+                    let! msg = inbox.Receive()
 
-                    match msg with
-                    | SetMessages(messages) ->
-                        _state <-
-                            { _state with
-                                Tick = _state.Tick + 1
-                                Messages = messages }
-
-                        replyChannel.Reply _state
-                    | SetDestinations destinations ->
-                        _state <-
-                            { _state with
-                                Tick = _state.Tick + 1
+                    let newState =
+                        match msg with
+                        | SetMessages(messages) -> { state with Messages = messages }
+                        | SetDestinations destinations ->
+                            { state with
                                 Destinations = destinations }
+                        | UpdateSent(src, known) ->
+                            let updated =
+                                state.Sent
+                                |> Map.tryFind src
+                                |> Option.defaultValue Set.empty
+                                |> Set.union known
 
-                        replyChannel.Reply _state
-                    | State ->
-                        _state <- { _state with Tick = _state.Tick + 1 }
-                        replyChannel.Reply _state
+                            { state with
+                                Sent = Map.add src updated state.Sent }
+                        | State replyChannel ->
+                            replyChannel.Reply state
+                            state
 
-                    return! loop ()
+                    return!
+                        loop
+                            { newState with
+                                Tick = newState.Tick + 1 }
                 }
 
-            loop ())
+            loop defaultState)
 
-    /// A helper to avoid waiting for reply when updating state
-    static let postWithoutReply =
-        MailboxProcessor<Set<int>>.Start(fun inbox ->
-            let rec messageLoop () =
-                async {
-                    let! messages = inbox.Receive()
-                    do agent.PostAndReply(fun rc -> SetMessages(messages), rc) |> ignore
-                    return! messageLoop ()
-                }
+    let updateMessages (messages: Set<int>) = agent.Post(SetMessages(messages))
 
-            messageLoop ())
+    let updateSent (dest: string) (messages: Set<int>) = agent.Post(UpdateSent(dest, messages))
 
-    static member UpdateMessages(messages: Set<int>) = postWithoutReply.Post messages
+    let updateDestinations (destinations: string list) =
+        agent.Post(SetDestinations(destinations))
 
-    static member UpdateDestinations(destinations: string list) =
-        agent.PostAndReply(fun rc -> SetDestinations(destinations), rc) |> ignore
-
-    static member GetState() = agent.PostAndReply(fun rc -> State, rc)
-
-let compareAndSyncMessages =
-    MailboxProcessor<System.Tuple<Set<int>, string, Dispatcher<Message>>>.Start(fun inbox ->
-        let rec loop count =
-            async {
-                let! messages, dest, dispatch = inbox.Receive()
-                let state = StateManagement.GetState()
-                let missing = Set.difference state.Messages messages
-
-                for msg in missing do
-                    { Message.empty () with
-                        Typ = Broadcast
-                        MsgId = Some(count)
-                        Message = Some(msg) }
-                    |> dispatch dest
-
-                return! loop (count + 1)
-            }
-
-        loop 1)
+    let getState () = agent.PostAndReply(fun rc -> State(rc))
 
 let addInReply (msg: Message) : Message = { msg with InReplyTo = msg.MsgId }
 
 let agent (dispatch: Dispatcher<Message>) : unit =
-    let state = StateManagement.GetState()
+    let state = StateManagement.getState ()
+
+    let computeMessages dest =
+        state.Sent
+        |> Map.tryFind dest
+        |> Option.defaultValue Set.empty
+        |> Set.difference state.Messages
+        |> Set.toList
+        |> Some
 
     for dest in state.Destinations do
-        { Typ = Read
-          MsgId = Some(state.Tick)
-          InReplyTo = None
-          Message = None
-          Messages = None
-          Topology = None }
+        { Message.empty () with
+            MsgId = Some(state.Tick)
+            Typ = Gossip
+            Messages = computeMessages dest }
         |> dispatch dest
 
 let handler (messages: Set<int>) (node: Node) (dispatch: Dispatcher<Message>) (MessageData(src, msg)) =
     match msg.Typ with
-    | TopologyOk -> failwith "node received topology_ok"
-    | ReadOk ->
-        compareAndSyncMessages.Post(msg.Messages.Value |> Set.ofList, src, dispatch)
-        messages
+    | ReadOk
+    | TopologyOk -> failwith $"node received {msg.Typ}"
     | BroadcastOk -> messages
+    | Gossip ->
+        let newMessages = msg.Messages.Value |> Set.ofList |> Set.union messages
+        StateManagement.updateMessages newMessages
+        newMessages
+    | GossipOk ->
+        msg.Messages.Value
+        |> Set.ofList
+        |> StateManagement.updateSent src
+        
+        messages
     | Broadcast ->
         let newMessages = Set.add msg.Message.Value messages
 
@@ -159,7 +143,7 @@ let handler (messages: Set<int>) (node: Node) (dispatch: Dispatcher<Message>) (M
         |> addInReply
         |> dispatch src
 
-        StateManagement.UpdateMessages newMessages
+        StateManagement.updateMessages newMessages
         newMessages
     | Read ->
         { msg with
@@ -172,7 +156,7 @@ let handler (messages: Set<int>) (node: Node) (dispatch: Dispatcher<Message>) (M
     | Topology ->
         msg.Topology
         |> Option.map (Map.tryFind node.Name >> Option.defaultValue [])
-        |> Option.iter StateManagement.UpdateDestinations
+        |> Option.iter StateManagement.updateDestinations
 
         { msg with
             Typ = TopologyOk
@@ -182,6 +166,6 @@ let handler (messages: Set<int>) (node: Node) (dispatch: Dispatcher<Message>) (M
 
         messages
 
-let agentData = { Agent = agent; Frequency = 500 }
+let agentData = { Agent = agent; Frequency = 100 }
 
 Node.run (Some(agentData)) { Handler = handler; State = Set.empty }
