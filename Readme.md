@@ -6,26 +6,31 @@ Implementation of the challenges described in the link above using _F#_. I had t
 with invalid state or to use low level json parsing. For now I chose to allow types with invalid state. Once done I may
 try the opposite.
 
-### Setup for Running in Windows
+### Setup
 
-This section contains instructions for developing the code in _Windows_ while running `maelstrom` from within
-_WSL_ (`maelstrom` does not support running in windows). For running in unix like OS (including completely inside WSL)
-follow the [getting startred][gs] page and the various documentations.
+This repository contains a [Taskfile][] to automate running the various tasks (you can also use the instructions in the
+[website][gs] instead while adopting the paths for the executables).
 
 #### Requirements
 
-* [Taskfile][]
-* _WSL_ configured as version 2 with default distribution (I'm using Ubuntu)
+The following dependencies needs to be installed in order to run the challenges (note the _WSL_ dependency if running on
+windows).
 
-#### Preparations
+* [Taskfile][].
+* _Dotnet_ (version 6.x).
+* _WSL_ (only if running on Windows - _maelstrom_ does not support running on Windows). If you're using Windows + WSL
+  all dependencies below has to be installed inside the default WSL distribution.
+* JDK (I'm running with 11).
+* _Tar_ with `bzip2`.
+* `wget`.
+* Gnuplot
 
-* Follow the [getting started][gs] guide for installing prerequisites in the default _WSL_ distro (e.g. JVM, Gnuplot,
-  etc).
-* Extract `maelstrom` in your _WSL_ `$HOME` (so the path will be `~/maelstrom/maelstrom`).
+> Note: Follow the [getting started][gs] guide for installing any other prerequisites.
 
 #### Running
 
-Run `Task --list` to see available tasks, run the one you want to execute.
+* Run `task prepare` to install build dependencies and _Maelstrom_.
+* Run `Task --list` to see available tasks, run the one you want to execute.
 
 [fly.io]: https://fly.io/dist-sys/
 
